@@ -4,7 +4,7 @@ Async Rust SDK for the [3x-ui](https://github.com/MHSanaei/3x-ui) panel API.
 
 [![Crates.io](https://img.shields.io/crates/v/threexui-rs)](https://crates.io/crates/threexui-rs)
 [![docs.rs](https://docs.rs/threexui-rs/badge.svg)](https://docs.rs/threexui-rs)
-[![CI](https://github.com/YOUR_USERNAME/3x-ui-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/3x-ui-rs/actions)
+[![CI](https://github.com/falhad/threexui-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/falhad/threexui-rs/actions)
 
 ## Version compatibility
 
