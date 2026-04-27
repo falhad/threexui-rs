@@ -1,4 +1,4 @@
-pub mod common;
+pub(crate) mod common;
 pub mod inbound;
 pub mod server;
 pub mod settings;
