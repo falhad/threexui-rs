@@ -9,6 +9,8 @@ repository = "https://github.com/YOUR_GITHUB_USERNAME/3x-ui-rs"
 keywords = ["3x-ui", "xray", "vpn", "proxy", "api-client"]
 categories = ["api-bindings", "network-programming"]
 readme = "README.md"
+documentation = "https://docs.rs/threexui-rs"
+exclude = ["/docs", "/.github"]
 
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "multipart", "rustls-tls"] }
