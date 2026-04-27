@@ -22,7 +22,10 @@ async fn main() -> threexui_rs::Result<()> {
     }
 
     let status = client.server().status().await?;
-    println!("\nServer CPU: {:.1}%  Xray: {}", status.cpu, status.xray.state);
+    println!(
+        "\nServer CPU: {:.1}%  Xray: {}",
+        status.cpu, status.xray.state
+    );
 
     client.logout().await?;
     Ok(())
