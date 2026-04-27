@@ -19,7 +19,9 @@ impl<'a> SettingsApi<'a> {
     }
 
     pub async fn update(&self, settings: &AllSetting) -> Result<()> {
-        self.client.post_empty("panel/setting/update", settings).await
+        self.client
+            .post_empty("panel/setting/update", settings)
+            .await
     }
 
     pub async fn update_user(
@@ -47,9 +49,7 @@ impl<'a> SettingsApi<'a> {
     }
 
     pub async fn default_xray_config(&self) -> Result<serde_json::Value> {
-        self.client
-            .get("panel/setting/getDefaultJsonConfig")
-            .await
+        self.client.get("panel/setting/getDefaultJsonConfig").await
     }
 }
 

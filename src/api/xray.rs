@@ -41,7 +41,7 @@ impl<'a> XrayApi<'a> {
     ) -> Result<serde_json::Value> {
         let outbound_str = serde_json::to_string(outbound)?;
         let all_str = all_outbounds
-            .map(|v| serde_json::to_string(v))
+            .map(serde_json::to_string)
             .transpose()?
             .unwrap_or_default();
         let params = [
@@ -91,7 +91,8 @@ impl<'a> XrayApi<'a> {
             .await?
             .json::<crate::models::common::ApiResponse<serde_json::Value>>()
             .await?;
-        resp.into_result().map(|v| v.unwrap_or(serde_json::Value::Null))
+        resp.into_result()
+            .map(|v| v.unwrap_or(serde_json::Value::Null))
     }
 
     pub async fn nord(&self, action: NordAction) -> Result<serde_json::Value> {
@@ -102,9 +103,7 @@ impl<'a> XrayApi<'a> {
         let req = self.client.inner.http.post(self.client.url(&path));
 
         let req = match &action {
-            NordAction::Servers { country_id } => {
-                req.form(&[("countryId", country_id.as_str())])
-            }
+            NordAction::Servers { country_id } => req.form(&[("countryId", country_id.as_str())]),
             NordAction::Register { token } => req.form(&[("token", token.as_str())]),
             NordAction::SetKey(key) => req.form(&[("key", key.as_str())]),
             _ => req,
@@ -115,7 +114,8 @@ impl<'a> XrayApi<'a> {
             .await?
             .json::<crate::models::common::ApiResponse<serde_json::Value>>()
             .await?;
-        resp.into_result().map(|v| v.unwrap_or(serde_json::Value::Null))
+        resp.into_result()
+            .map(|v| v.unwrap_or(serde_json::Value::Null))
     }
 }
 

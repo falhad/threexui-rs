@@ -61,8 +61,12 @@ impl ClientConfigBuilder {
     }
 
     pub fn build(self) -> crate::Result<ClientConfig> {
-        let host = self.host.ok_or_else(|| crate::Error::Config("host is required".into()))?;
-        let port = self.port.ok_or_else(|| crate::Error::Config("port is required".into()))?;
+        let host = self
+            .host
+            .ok_or_else(|| crate::Error::Config("host is required".into()))?;
+        let port = self
+            .port
+            .ok_or_else(|| crate::Error::Config("port is required".into()))?;
         if port == 0 {
             return Err(crate::Error::Config("port cannot be 0".into()));
         }

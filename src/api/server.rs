@@ -53,10 +53,7 @@ impl<'a> ServerApi<'a> {
 
     pub async fn stop_xray(&self) -> Result<()> {
         self.client
-            .post_empty(
-                "panel/api/server/stopXrayService",
-                &serde_json::json!({}),
-            )
+            .post_empty("panel/api/server/stopXrayService", &serde_json::json!({}))
             .await
     }
 

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
     VMess,
@@ -13,13 +13,8 @@ pub enum Protocol {
     HTTP,
     Mixed,
     #[serde(other)]
+    #[default]
     Unknown,
-}
-
-impl Default for Protocol {
-    fn default() -> Self {
-        Protocol::Unknown
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

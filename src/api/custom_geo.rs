@@ -15,7 +15,9 @@ impl<'a> CustomGeoApi<'a> {
     }
 
     pub async fn add(&self, geo: &CreateCustomGeo) -> Result<()> {
-        self.client.post_empty("panel/api/custom-geo/add", geo).await
+        self.client
+            .post_empty("panel/api/custom-geo/add", geo)
+            .await
     }
 
     pub async fn update(&self, id: i64, geo: &CreateCustomGeo) -> Result<()> {

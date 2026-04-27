@@ -195,11 +195,7 @@ impl Client {
         }
     }
 
-    pub(crate) async fn post_form_empty(
-        &self,
-        path: &str,
-        params: &[(&str, &str)],
-    ) -> Result<()> {
+    pub(crate) async fn post_form_empty(&self, path: &str, params: &[(&str, &str)]) -> Result<()> {
         self.require_auth()?;
         let resp = self
             .inner
@@ -283,6 +279,9 @@ mod tests {
     async fn require_auth_fails_when_not_logged_in() {
         let server = MockServer::start().await;
         let client = mock_client(&server).await;
-        assert!(matches!(client.require_auth(), Err(Error::NotAuthenticated)));
+        assert!(matches!(
+            client.require_auth(),
+            Err(Error::NotAuthenticated)
+        ));
     }
 }

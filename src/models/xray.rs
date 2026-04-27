@@ -22,7 +22,10 @@ pub enum WarpAction {
     Data,
     Delete,
     Config,
-    Register { private_key: String, public_key: String },
+    Register {
+        private_key: String,
+        public_key: String,
+    },
     SetLicense(String),
 }
 
@@ -69,15 +72,25 @@ mod tests {
     fn warp_action_str() {
         assert_eq!(WarpAction::Data.action_str(), "data");
         assert_eq!(WarpAction::Delete.action_str(), "del");
-        assert_eq!(WarpAction::Register {
-            private_key: "a".into(),
-            public_key: "b".into()
-        }.action_str(), "reg");
+        assert_eq!(
+            WarpAction::Register {
+                private_key: "a".into(),
+                public_key: "b".into()
+            }
+            .action_str(),
+            "reg"
+        );
     }
 
     #[test]
     fn nord_action_str() {
         assert_eq!(NordAction::Countries.action_str(), "countries");
-        assert_eq!(NordAction::Servers { country_id: "1".into() }.action_str(), "servers");
+        assert_eq!(
+            NordAction::Servers {
+                country_id: "1".into()
+            }
+            .action_str(),
+            "servers"
+        );
     }
 }

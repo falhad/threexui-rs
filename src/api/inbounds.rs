@@ -52,11 +52,7 @@ impl<'a> InboundsApi<'a> {
             .and_then(|v| v.ok_or_else(|| crate::Error::Api("empty response".into())))
     }
 
-    pub async fn add_client(
-        &self,
-        inbound_id: i64,
-        clients: &[serde_json::Value],
-    ) -> Result<()> {
+    pub async fn add_client(&self, inbound_id: i64, clients: &[serde_json::Value]) -> Result<()> {
         let settings = serde_json::json!({ "clients": clients }).to_string();
         let body = serde_json::json!({ "id": inbound_id, "settings": settings });
         self.client
@@ -83,10 +79,7 @@ impl<'a> InboundsApi<'a> {
     pub async fn delete_client(&self, inbound_id: i64, client_id: &str) -> Result<()> {
         self.client
             .post_empty(
-                &format!(
-                    "panel/api/inbounds/{}/delClient/{}",
-                    inbound_id, client_id
-                ),
+                &format!("panel/api/inbounds/{}/delClient/{}", inbound_id, client_id),
                 &serde_json::json!({}),
             )
             .await
@@ -118,10 +111,7 @@ impl<'a> InboundsApi<'a> {
         });
         self.client
             .post(
-                &format!(
-                    "panel/api/inbounds/{}/copyClients",
-                    target_inbound_id
-                ),
+                &format!("panel/api/inbounds/{}/copyClients", target_inbound_id),
                 &body,
             )
             .await
@@ -150,10 +140,7 @@ impl<'a> InboundsApi<'a> {
         email: &str,
     ) -> Result<crate::models::inbound::ClientTraffic> {
         self.client
-            .get(&format!(
-                "panel/api/inbounds/getClientTraffics/{}",
-                email
-            ))
+            .get(&format!("panel/api/inbounds/getClientTraffics/{}", email))
             .await
     }
 
@@ -162,10 +149,7 @@ impl<'a> InboundsApi<'a> {
         id: &str,
     ) -> Result<Vec<crate::models::inbound::ClientTraffic>> {
         self.client
-            .get(&format!(
-                "panel/api/inbounds/getClientTrafficsById/{}",
-                id
-            ))
+            .get(&format!("panel/api/inbounds/getClientTrafficsById/{}", id))
             .await
     }
 
@@ -193,10 +177,7 @@ impl<'a> InboundsApi<'a> {
     pub async fn reset_all_client_traffics(&self, inbound_id: i64) -> Result<()> {
         self.client
             .post_empty(
-                &format!(
-                    "panel/api/inbounds/resetAllClientTraffics/{}",
-                    inbound_id
-                ),
+                &format!("panel/api/inbounds/resetAllClientTraffics/{}", inbound_id),
                 &serde_json::json!({}),
             )
             .await
@@ -338,16 +319,21 @@ mod tests {
             .await;
 
         let client = auth_client(&server).await;
-        let new_client =
-            serde_json::json!({"email": "user@example.com", "enable": true});
-        client.inbounds().add_client(1, &[new_client]).await.unwrap();
+        let new_client = serde_json::json!({"email": "user@example.com", "enable": true});
+        client
+            .inbounds()
+            .add_client(1, &[new_client])
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
     async fn delete_client_by_email_succeeds() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/panel/api/inbounds/2/delClientByEmail/user@example.com"))
+            .and(path(
+                "/panel/api/inbounds/2/delClientByEmail/user@example.com",
+            ))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "success": true, "msg": "deleted", "obj": null
             })))
