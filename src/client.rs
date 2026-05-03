@@ -12,6 +12,42 @@ use crate::error::Result;
 use crate::models::common::ApiResponse;
 use crate::Error;
 
+/// Centralized response decoder.
+///
+/// Treats HTTP 404 as `Error::EndpointNotFound` (older 3x-ui versions return 404
+/// for endpoints added in newer releases — the previous behaviour was an opaque
+/// JSON-decode error).
+///
+/// For any non-success status with a non-JSON body we surface the status code in
+/// the resulting `Error::Api`.
+pub(crate) async fn read_api_response<T: serde::de::DeserializeOwned>(
+    resp: reqwest::Response,
+) -> Result<ApiResponse<T>> {
+    let status = resp.status();
+    let path = resp.url().path().to_string();
+    let bytes = resp.bytes().await?;
+    if status == reqwest::StatusCode::NOT_FOUND {
+        return Err(Error::EndpointNotFound(path));
+    }
+    if bytes.is_empty() {
+        return Err(Error::Api(format!("empty response body (HTTP {})", status)));
+    }
+    serde_json::from_slice::<ApiResponse<T>>(&bytes).map_err(|e| {
+        if status.is_success() {
+            Error::Json(e)
+        } else {
+            // Trim & expose the body so calls hitting an HTML error page get
+            // something readable.
+            let snippet: String = String::from_utf8_lossy(&bytes).chars().take(200).collect();
+            Error::Api(format!(
+                "HTTP {} — non-JSON body: {}",
+                status,
+                snippet.trim()
+            ))
+        }
+    })
+}
+
 pub(crate) struct ClientInner {
     pub http: reqwest::Client,
     pub base_url: String,
@@ -25,12 +61,24 @@ pub struct Client {
 
 impl Client {
     pub fn new(config: ClientConfig) -> Self {
-        let http = reqwest::Client::builder()
+        let mut builder = reqwest::Client::builder()
             .cookie_store(true)
             .danger_accept_invalid_certs(config.accept_invalid_certs)
-            .timeout(Duration::from_secs(config.timeout_secs))
-            .build()
-            .expect("failed to build reqwest client");
+            .timeout(Duration::from_secs(config.timeout_secs));
+
+        if let Some(proxy_url) = &config.proxy {
+            // URL was already validated in `ClientConfigBuilder::build`, so
+            // this should not fail unless the user constructed `ClientConfig`
+            // by hand with garbage.
+            let mut proxy = reqwest::Proxy::all(proxy_url.as_str())
+                .expect("proxy url validated at config build time");
+            if let (Some(u), Some(p)) = (&config.proxy_username, &config.proxy_password) {
+                proxy = proxy.basic_auth(u, p);
+            }
+            builder = builder.proxy(proxy);
+        }
+
+        let http = builder.build().expect("failed to build reqwest client");
 
         Client {
             inner: Arc::new(ClientInner {
@@ -143,14 +191,8 @@ impl Client {
 
     pub(crate) async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T> {
         self.require_auth()?;
-        let resp = self
-            .inner
-            .http
-            .get(self.url(path))
-            .send()
-            .await?
-            .json::<ApiResponse<T>>()
-            .await?;
+        let raw = self.inner.http.get(self.url(path)).send().await?;
+        let resp = read_api_response::<T>(raw).await?;
         resp.into_result()
             .and_then(|v| v.ok_or_else(|| Error::Api("empty response".into())))
     }
@@ -161,15 +203,14 @@ impl Client {
         T: serde::de::DeserializeOwned,
     {
         self.require_auth()?;
-        let resp = self
+        let raw = self
             .inner
             .http
             .post(self.url(path))
             .json(body)
             .send()
-            .await?
-            .json::<ApiResponse<T>>()
             .await?;
+        let resp = read_api_response::<T>(raw).await?;
         resp.into_result()
             .and_then(|v| v.ok_or_else(|| Error::Api("empty response".into())))
     }
@@ -179,15 +220,14 @@ impl Client {
         B: serde::Serialize,
     {
         self.require_auth()?;
-        let resp = self
+        let raw = self
             .inner
             .http
             .post(self.url(path))
             .json(body)
             .send()
-            .await?
-            .json::<ApiResponse<serde_json::Value>>()
             .await?;
+        let resp = read_api_response::<serde_json::Value>(raw).await?;
         if resp.success {
             Ok(())
         } else {
@@ -197,15 +237,14 @@ impl Client {
 
     pub(crate) async fn post_form_empty(&self, path: &str, params: &[(&str, &str)]) -> Result<()> {
         self.require_auth()?;
-        let resp = self
+        let raw = self
             .inner
             .http
             .post(self.url(path))
             .form(params)
             .send()
-            .await?
-            .json::<ApiResponse<serde_json::Value>>()
             .await?;
+        let resp = read_api_response::<serde_json::Value>(raw).await?;
         if resp.success {
             Ok(())
         } else {
@@ -273,6 +312,82 @@ mod tests {
         let client = mock_client(&server).await;
         let err = client.login("admin", "wrong").await.unwrap_err();
         assert!(matches!(err, Error::Auth(_)));
+    }
+
+    #[tokio::test]
+    async fn http_404_returns_endpoint_not_found() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/login"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "success": true, "msg": "", "obj": null
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/panel/api/missing"))
+            .respond_with(ResponseTemplate::new(404).set_body_string(""))
+            .mount(&server)
+            .await;
+
+        let client = mock_client(&server).await;
+        client.login("admin", "p").await.unwrap();
+
+        let err: Result<serde_json::Value> = client.get("panel/api/missing").await;
+        match err {
+            Err(Error::EndpointNotFound(p)) => assert!(p.contains("missing")),
+            other => panic!("expected EndpointNotFound, got {:?}", other.is_ok()),
+        }
+    }
+
+    #[tokio::test]
+    async fn http_500_with_html_surfaces_status_in_api_error() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/login"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "success": true, "msg": "", "obj": null
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/panel/api/boom"))
+            .respond_with(
+                ResponseTemplate::new(500).set_body_string("<html>Internal Server Error</html>"),
+            )
+            .mount(&server)
+            .await;
+
+        let client = mock_client(&server).await;
+        client.login("admin", "p").await.unwrap();
+
+        let err: Result<serde_json::Value> = client.get("panel/api/boom").await;
+        let msg = err.unwrap_err().to_string();
+        assert!(msg.contains("HTTP 500"), "msg = {}", msg);
+    }
+
+    #[tokio::test]
+    async fn empty_body_returns_api_error_not_panic() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/login"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "success": true, "msg": "", "obj": null
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/panel/api/empty"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(""))
+            .mount(&server)
+            .await;
+
+        let client = mock_client(&server).await;
+        client.login("admin", "p").await.unwrap();
+
+        let err: Result<serde_json::Value> = client.get("panel/api/empty").await;
+        let msg = err.unwrap_err().to_string();
+        assert!(msg.contains("empty response body"), "msg = {}", msg);
     }
 
     #[tokio::test]

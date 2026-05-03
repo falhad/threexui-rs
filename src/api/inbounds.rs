@@ -38,16 +38,15 @@ impl<'a> InboundsApi<'a> {
     pub async fn import(&self, inbound: &Inbound) -> Result<Inbound> {
         let data_str = serde_json::to_string(inbound)?;
         self.client.require_auth()?;
-        let resp = self
+        let raw = self
             .client
             .inner
             .http
             .post(self.client.url("panel/api/inbounds/import"))
             .form(&[("data", data_str.as_str())])
             .send()
-            .await?
-            .json::<crate::models::common::ApiResponse<Inbound>>()
             .await?;
+        let resp = crate::client::read_api_response::<Inbound>(raw).await?;
         resp.into_result()
             .and_then(|v| v.ok_or_else(|| crate::Error::Api("empty response".into())))
     }

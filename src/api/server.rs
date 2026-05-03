@@ -87,18 +87,16 @@ impl<'a> ServerApi<'a> {
         let params = [("level", level), ("syslog", syslog)];
         let path = format!("panel/api/server/logs/{}", count);
         self.client.require_auth()?;
-        let resp = self
+        let raw = self
             .client
             .inner
             .http
             .post(self.client.url(&path))
             .form(&params)
             .send()
-            .await?
-            .json::<crate::models::common::ApiResponse<Vec<String>>>()
             .await?;
-        resp.into_result()
-            .and_then(|v| v.ok_or_else(|| crate::Error::Api("empty response".into())))
+        let resp = crate::client::read_api_response::<Vec<String>>(raw).await?;
+        resp.into_result().map(|v| v.unwrap_or_default())
     }
 
     pub async fn xray_logs(
@@ -117,34 +115,31 @@ impl<'a> ServerApi<'a> {
         ];
         let path = format!("panel/api/server/xraylogs/{}", count);
         self.client.require_auth()?;
-        let resp = self
+        let raw = self
             .client
             .inner
             .http
             .post(self.client.url(&path))
             .form(&params)
             .send()
-            .await?
-            .json::<crate::models::common::ApiResponse<Vec<String>>>()
             .await?;
-        resp.into_result()
-            .and_then(|v| v.ok_or_else(|| crate::Error::Api("empty response".into())))
+        let resp = crate::client::read_api_response::<Vec<String>>(raw).await?;
+        resp.into_result().map(|v| v.unwrap_or_default())
     }
 
     pub async fn import_db(&self, data: Vec<u8>) -> Result<()> {
         self.client.require_auth()?;
         let part = reqwest::multipart::Part::bytes(data).file_name("x-ui.db");
         let form = reqwest::multipart::Form::new().part("db", part);
-        let resp = self
+        let raw = self
             .client
             .inner
             .http
             .post(self.client.url("panel/api/server/importDB"))
             .multipart(form)
             .send()
-            .await?
-            .json::<crate::models::common::ApiResponse<serde_json::Value>>()
             .await?;
+        let resp = crate::client::read_api_response::<serde_json::Value>(raw).await?;
         if resp.success {
             Ok(())
         } else {
@@ -155,16 +150,15 @@ impl<'a> ServerApi<'a> {
     pub async fn new_ech_cert(&self, sni: &str) -> Result<EchCert> {
         let params = [("sni", sni)];
         self.client.require_auth()?;
-        let resp = self
+        let raw = self
             .client
             .inner
             .http
             .post(self.client.url("panel/api/server/getNewEchCert"))
             .form(&params)
             .send()
-            .await?
-            .json::<crate::models::common::ApiResponse<EchCert>>()
             .await?;
+        let resp = crate::client::read_api_response::<EchCert>(raw).await?;
         resp.into_result()
             .and_then(|v| v.ok_or_else(|| crate::Error::Api("empty response".into())))
     }

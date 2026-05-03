@@ -1,4 +1,4 @@
-use crate::models::custom_geo::{CreateCustomGeo, CustomGeoResource};
+use crate::models::custom_geo::{CreateCustomGeo, CustomGeoAliases, CustomGeoResource};
 use crate::{Client, Result};
 
 pub struct CustomGeoApi<'a> {
@@ -10,7 +10,7 @@ impl<'a> CustomGeoApi<'a> {
         self.client.get("panel/api/custom-geo/list").await
     }
 
-    pub async fn aliases(&self) -> Result<Vec<String>> {
+    pub async fn aliases(&self) -> Result<CustomGeoAliases> {
         self.client.get("panel/api/custom-geo/aliases").await
     }
 

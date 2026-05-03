@@ -6,6 +6,13 @@ pub struct ClientConfig {
     pub tls: bool,
     pub accept_invalid_certs: bool,
     pub timeout_secs: u64,
+    /// Optional outbound proxy URL. Supports `http://`, `https://`,
+    /// `socks5://` and `socks5h://` schemes. Auth may be embedded
+    /// (`http://user:pass@host:port`) or supplied separately via
+    /// [`ClientConfigBuilder::proxy_auth`].
+    pub proxy: Option<String>,
+    pub proxy_username: Option<String>,
+    pub proxy_password: Option<String>,
 }
 
 impl ClientConfig {
@@ -27,6 +34,9 @@ pub struct ClientConfigBuilder {
     tls: bool,
     accept_invalid_certs: bool,
     timeout_secs: Option<u64>,
+    proxy: Option<String>,
+    proxy_username: Option<String>,
+    proxy_password: Option<String>,
 }
 
 impl ClientConfigBuilder {
@@ -60,6 +70,32 @@ impl ClientConfigBuilder {
         self
     }
 
+    /// Route every request through an outbound proxy.
+    ///
+    /// Accepts `http://`, `https://`, `socks5://` or `socks5h://` URLs.
+    /// Authentication may be embedded (`http://u:p@host:1080`) or set
+    /// separately via [`Self::proxy_auth`].
+    pub fn proxy(mut self, url: impl Into<String>) -> Self {
+        self.proxy = Some(url.into());
+        self
+    }
+
+    /// Supply basic-auth credentials for the proxy.
+    /// Has no effect unless [`Self::proxy`] is also set.
+    pub fn proxy_auth(mut self, username: impl Into<String>, password: impl Into<String>) -> Self {
+        self.proxy_username = Some(username.into());
+        self.proxy_password = Some(password.into());
+        self
+    }
+
+    /// Disable any previously configured proxy.
+    pub fn no_proxy(mut self) -> Self {
+        self.proxy = None;
+        self.proxy_username = None;
+        self.proxy_password = None;
+        self
+    }
+
     pub fn build(self) -> crate::Result<ClientConfig> {
         let host = self
             .host
@@ -70,6 +106,11 @@ impl ClientConfigBuilder {
         if port == 0 {
             return Err(crate::Error::Config("port cannot be 0".into()));
         }
+        if let Some(url) = &self.proxy {
+            // Surface bad URLs / unsupported schemes early as Error::Config.
+            reqwest::Proxy::all(url.as_str())
+                .map_err(|e| crate::Error::Config(format!("invalid proxy url: {}", e)))?;
+        }
         Ok(ClientConfig {
             host,
             port,
@@ -77,6 +118,9 @@ impl ClientConfigBuilder {
             tls: self.tls,
             accept_invalid_certs: self.accept_invalid_certs,
             timeout_secs: self.timeout_secs.unwrap_or(30),
+            proxy: self.proxy,
+            proxy_username: self.proxy_username,
+            proxy_password: self.proxy_password,
         })
     }
 }
@@ -152,6 +196,56 @@ mod tests {
     fn missing_host_errors() {
         let err = ClientConfig::builder().port(2053).build().unwrap_err();
         assert!(err.to_string().contains("host is required"));
+    }
+
+    #[test]
+    fn proxy_http_url_accepted() {
+        let cfg = ClientConfig::builder()
+            .host("localhost")
+            .port(2053)
+            .proxy("http://127.0.0.1:8080")
+            .build()
+            .unwrap();
+        assert_eq!(cfg.proxy.as_deref(), Some("http://127.0.0.1:8080"));
+    }
+
+    #[test]
+    fn proxy_socks5_url_accepted() {
+        let cfg = ClientConfig::builder()
+            .host("localhost")
+            .port(2053)
+            .proxy("socks5://127.0.0.1:1080")
+            .proxy_auth("user", "pass")
+            .build()
+            .unwrap();
+        assert_eq!(cfg.proxy_username.as_deref(), Some("user"));
+        assert_eq!(cfg.proxy_password.as_deref(), Some("pass"));
+    }
+
+    #[test]
+    fn proxy_invalid_url_errors() {
+        let err = ClientConfig::builder()
+            .host("localhost")
+            .port(2053)
+            .proxy("not a url at all")
+            .build()
+            .unwrap_err();
+        assert!(err.to_string().contains("invalid proxy url"), "{}", err);
+    }
+
+    #[test]
+    fn no_proxy_clears_settings() {
+        let cfg = ClientConfig::builder()
+            .host("localhost")
+            .port(2053)
+            .proxy("http://1.2.3.4:8080")
+            .proxy_auth("u", "p")
+            .no_proxy()
+            .build()
+            .unwrap();
+        assert!(cfg.proxy.is_none());
+        assert!(cfg.proxy_username.is_none());
+        assert!(cfg.proxy_password.is_none());
     }
 
     #[test]

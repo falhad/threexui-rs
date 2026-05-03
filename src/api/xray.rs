@@ -7,9 +7,13 @@ pub struct XrayApi<'a> {
 
 impl<'a> XrayApi<'a> {
     pub async fn get_setting(&self) -> Result<XraySetting> {
-        self.client
+        // The panel returns `obj` as a JSON-encoded string of the actual settings,
+        // so we read it as a string first then re-parse.
+        let raw: String = self
+            .client
             .post("panel/xray/", &serde_json::json!({}))
-            .await
+            .await?;
+        Ok(serde_json::from_str(&raw)?)
     }
 
     pub async fn update_setting(&self, xray_config: &str, test_url: &str) -> Result<()> {
@@ -49,16 +53,15 @@ impl<'a> XrayApi<'a> {
             ("allOutbounds", all_str.as_str()),
         ];
         self.client.require_auth()?;
-        let resp = self
+        let raw = self
             .client
             .inner
             .http
             .post(self.client.url("panel/xray/testOutbound"))
             .form(&params)
             .send()
-            .await?
-            .json::<crate::models::common::ApiResponse<serde_json::Value>>()
             .await?;
+        let resp = crate::client::read_api_response::<serde_json::Value>(raw).await?;
         resp.into_result()
             .and_then(|v| v.ok_or_else(|| crate::Error::Api("empty response".into())))
     }
@@ -86,11 +89,8 @@ impl<'a> XrayApi<'a> {
             _ => req,
         };
 
-        let resp = req
-            .send()
-            .await?
-            .json::<crate::models::common::ApiResponse<serde_json::Value>>()
-            .await?;
+        let raw = req.send().await?;
+        let resp = crate::client::read_api_response::<serde_json::Value>(raw).await?;
         resp.into_result()
             .map(|v| v.unwrap_or(serde_json::Value::Null))
     }
@@ -109,11 +109,8 @@ impl<'a> XrayApi<'a> {
             _ => req,
         };
 
-        let resp = req
-            .send()
-            .await?
-            .json::<crate::models::common::ApiResponse<serde_json::Value>>()
-            .await?;
+        let raw = req.send().await?;
+        let resp = crate::client::read_api_response::<serde_json::Value>(raw).await?;
         resp.into_result()
             .map(|v| v.unwrap_or(serde_json::Value::Null))
     }

@@ -11,6 +11,9 @@ pub enum Error {
     #[error("api error: {0}")]
     Api(String),
 
+    #[error("endpoint not found: {0} (panel version may be too old)")]
+    EndpointNotFound(String),
+
     #[error("http error: {0}")]
     Http(#[from] reqwest::Error),
 
@@ -37,6 +40,13 @@ mod tests {
     fn error_display_api() {
         let e = Error::Api("bad request".to_string());
         assert_eq!(e.to_string(), "api error: bad request");
+    }
+
+    #[test]
+    fn error_display_endpoint_not_found() {
+        let e = Error::EndpointNotFound("/panel/api/inbounds/X/copyClients".to_string());
+        assert!(e.to_string().contains("endpoint not found"));
+        assert!(e.to_string().contains("copyClients"));
     }
 
     #[test]

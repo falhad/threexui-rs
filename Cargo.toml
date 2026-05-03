@@ -1,9 +1,9 @@
 [package]
 name = "threexui-rs"
-version = "2.9.3"
+version = "2.9.4"
 edition = "2021"
 rust-version = "1.75"
-description = "Async Rust SDK for the 3x-ui panel API (targets 3x-ui v2.9.3)"
+description = "Async Rust SDK for the 3x-ui panel API (compatible with 3x-ui v2.9.2 and v2.9.3)"
 license = "MIT"
 repository = "https://github.com/falhad/threexui-rs"
 keywords = ["3x-ui", "xray", "vpn", "proxy", "api-client"]
@@ -13,7 +13,7 @@ documentation = "https://docs.rs/threexui-rs"
 exclude = ["/docs", "/.github"]
 
 [dependencies]
-reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "multipart", "rustls-tls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "cookies", "multipart", "rustls", "form", "socks"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

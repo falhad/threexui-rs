@@ -152,6 +152,7 @@ pub struct AllSetting {
     #[serde(default)]
     pub ldap_auto_delete: bool,
     #[serde(default)]
+    #[serde(rename = "ldapDefaultTotalGB")]
     pub ldap_default_total_gb: i32,
     #[serde(default)]
     pub ldap_default_expiry_days: i32,

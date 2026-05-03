@@ -9,17 +9,20 @@ An async Rust SDK for the [3x-ui](https://github.com/MHSanaei/3x-ui) panel API. 
 
 ## Version compatibility
 
-Each release of `threexui-rs` targets the matching 3x-ui panel version. Use the same version number as your panel.
+| threexui-rs | 3x-ui panel(s)        |
+|-------------|------------------------|
+| 2.9.4       | v2.9.2, v2.9.3        |
+| 2.9.3       | v2.9.3                |
 
-| threexui-rs | 3x-ui panel |
-|-------------|-------------|
-| 2.9.3       | v2.9.3      |
+`2.9.4` is live-tested against both panel versions. The only behavioral
+difference: `inbounds.copy_clients` does not exist in v2.9.2 and returns
+`Error::EndpointNotFound` — match on it to fall back gracefully.
 
 ## Installation
 
 ```toml
 [dependencies]
-threexui-rs = "2.9.3"
+threexui-rs = "2.9.4"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -61,6 +64,22 @@ let config = ClientConfig::builder()
     .timeout_secs(30)
     .build()?;
 ```
+
+### Outbound proxy (optional)
+
+Route every request through an HTTP, HTTPS, or SOCKS5 proxy:
+
+```rust
+let config = ClientConfig::builder()
+    .host("panel.example.com").port(2053)
+    .proxy("socks5h://127.0.0.1:1080")   // also: http://, https://, socks5://
+    .proxy_auth("username", "password")  // optional basic-auth
+    .build()?;
+```
+
+- `socks5://` resolves DNS locally, `socks5h://` resolves it through the proxy.
+- Bad proxy URLs surface as `Error::Config` at `build()` time.
+- Use `.no_proxy()` on the builder to clear a previously set proxy.
 
 ## Authentication
 
@@ -185,22 +204,32 @@ match client.inbounds().list().await {
     Err(Error::NotAuthenticated) => eprintln!("call login() first"),
     Err(Error::Auth(msg)) => eprintln!("login failed: {}", msg),
     Err(Error::Api(msg)) => eprintln!("panel returned error: {}", msg),
+    Err(Error::EndpointNotFound(path)) => eprintln!("endpoint missing on this panel: {}", path),
     Err(Error::Http(e)) => eprintln!("http error: {}", e),
     Err(e) => eprintln!("other error: {}", e),
 }
 ```
 
+`Error::EndpointNotFound` is returned when the panel responds with HTTP 404.
+This typically means the panel is older than the lib (e.g. calling
+`inbounds.copy_clients` on a v2.9.2 panel). Match on it to fall back.
+
 ## Examples
 
 See the [`examples/`](examples/) directory:
 
-- [`list_inbounds.rs`](examples/list_inbounds.rs) — list all inbounds and print server status
-- [`add_client.rs`](examples/add_client.rs) — generate a UUID and add a new VLESS client
+- [`list_inbounds.rs`](examples/list_inbounds.rs) — list all inbounds and print server status.
+- [`add_client.rs`](examples/add_client.rs) — generate a UUID and add a new VLESS client.
+- [`live_test.rs`](examples/live_test.rs) — full smoke test of every public API method.
+- [`scenarios.rs`](examples/scenarios.rs) — 16 production scenarios (multi-protocol create, renew, disable/enable, reset-uuid, data-limit, traffic resets, concurrent reads, special characters, negative paths…).
+- [`proxy_test.rs`](examples/proxy_test.rs) — end-to-end verification of HTTP / SOCKS5 proxy support.
 
 Run an example (requires a live panel):
 
 ```bash
 cargo run --example list_inbounds
+cargo run --example scenarios -- 127.0.0.1 2053 admin admin
+cargo run --example proxy_test -- panel.example.com 2053 admin pw "socks5h://127.0.0.1:1080"
 ```
 
 ## License

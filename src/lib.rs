@@ -54,4 +54,4 @@ pub use models::settings::AllSetting;
 pub use models::xray::{NordAction, OutboundTraffic, WarpAction, XraySetting};
 
 // Custom geo models
-pub use models::custom_geo::{CreateCustomGeo, CustomGeoResource};
+pub use models::custom_geo::{CreateCustomGeo, CustomGeoAliases, CustomGeoResource};

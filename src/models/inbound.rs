@@ -1,4 +1,48 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+fn deserialize_null_default<'de, D, T>(de: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    let opt = Option::<T>::deserialize(de)?;
+    Ok(opt.unwrap_or_default())
+}
+
+/// Accept i64 from JSON number, string, or null.
+/// 3x-ui sometimes serializes `tgId` as a string (e.g. `"77313385"`).
+fn deserialize_flex_i64<'de, D>(de: D) -> Result<i64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+    let v = serde_json::Value::deserialize(de)?;
+    match v {
+        serde_json::Value::Null => Ok(0),
+        serde_json::Value::Number(n) => n
+            .as_i64()
+            .or_else(|| n.as_f64().map(|f| f as i64))
+            .ok_or_else(|| D::Error::custom("number out of range for i64")),
+        serde_json::Value::String(s) => {
+            if s.is_empty() {
+                Ok(0)
+            } else {
+                s.parse::<i64>().map_err(D::Error::custom)
+            }
+        }
+        other => Err(D::Error::custom(format!(
+            "expected i64-compatible value, got {}",
+            other
+        ))),
+    }
+}
+
+fn serialize_i64<S>(v: &i64, ser: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    ser.serialize_i64(*v)
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -57,7 +101,7 @@ pub struct Inbound {
     pub traffic_reset: String,
     #[serde(default)]
     pub last_traffic_reset_time: i64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub client_stats: Vec<ClientTraffic>,
     pub listen: String,
     pub port: u16,
@@ -81,9 +125,17 @@ pub struct InboundClient {
     pub password: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub security: String,
+    #[serde(default)]
     pub limit_ip: i32,
+    #[serde(default, rename = "totalGB")]
     pub total_gb: i64,
+    #[serde(default)]
     pub expiry_time: i64,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_flex_i64",
+        serialize_with = "serialize_i64"
+    )]
     pub tg_id: i64,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub sub_id: String,
@@ -108,6 +160,47 @@ mod tests {
     fn protocol_unknown_variant() {
         let p: Protocol = serde_json::from_str(r#""socks5""#).unwrap();
         assert_eq!(p, Protocol::Unknown);
+    }
+
+    #[test]
+    fn inbound_with_null_client_stats() {
+        // 3x-ui /panel/api/inbounds/get/{id} returns clientStats: null
+        let raw = r#"{
+            "id":1,"up":0,"down":0,"total":0,"remark":"x","enable":true,
+            "expiryTime":0,"listen":"","port":80,"protocol":"vless",
+            "settings":"{}","streamSettings":"{}","tag":"i","sniffing":"{}",
+            "clientStats":null
+        }"#;
+        let inb: Inbound = serde_json::from_str(raw).unwrap();
+        assert!(inb.client_stats.is_empty());
+    }
+
+    #[test]
+    fn inbound_client_with_newer_fields() {
+        // Real 3x-ui client payload: totalGB (uppercase GB), tgId as string,
+        // plus unknown fields comment/created_at/updated_at.
+        let raw = r#"{
+            "id":"abc","email":"u@example.com","enable":true,"flow":"",
+            "limitIp":1,"totalGB":1073741824,"expiryTime":-604800000,
+            "tgId":"77313385","subId":"x","comment":"hi",
+            "created_at":1777667608000,"updated_at":1777667608000,
+            "reset":0
+        }"#;
+        let c: InboundClient = serde_json::from_str(raw).unwrap();
+        assert_eq!(c.total_gb, 1073741824);
+        assert_eq!(c.tg_id, 77313385);
+        assert_eq!(c.comment, "hi");
+    }
+
+    #[test]
+    fn inbound_client_tg_id_as_int_or_null() {
+        let raw_int = r#"{"id":"a","email":"e","enable":true,"limitIp":0,"totalGB":0,"expiryTime":0,"tgId":42,"reset":0}"#;
+        let c: InboundClient = serde_json::from_str(raw_int).unwrap();
+        assert_eq!(c.tg_id, 42);
+
+        let raw_null = r#"{"id":"a","email":"e","enable":true,"limitIp":0,"totalGB":0,"expiryTime":0,"tgId":null,"reset":0}"#;
+        let c: InboundClient = serde_json::from_str(raw_null).unwrap();
+        assert_eq!(c.tg_id, 0);
     }
 
     #[test]
