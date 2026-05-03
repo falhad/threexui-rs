@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely tracks the upstream [3x-ui panel](https://github.com/MHSanaei/3x-ui) version.
 
+## [2.9.5] – 2026-05-03
+
+### Fixed
+
+- **Build failure on common Linux CI runners.** `2.9.4` pulled in
+  `aws-lc-sys` transitively via reqwest 0.13's `rustls` feature; that
+  crate's build script panics on `cc` versions affected by GCC bug 95189
+  (`### COMPILER BUG DETECTED ###`). Switched to reqwest's
+  `rustls-no-provider` feature and depend on `rustls` 0.23 with the
+  pure-Rust `ring` crypto provider instead. `aws-lc-sys` is no longer
+  in the dependency tree.
+- `Client::new` now installs the `ring` crypto provider as the process
+  default on first call (idempotent, lock-free via `std::sync::Once`).
+
+No public API change.
+
 ## [2.9.4] – 2026-05-03
 
 Live-tested against 3x-ui **v2.9.2** and **v2.9.3** panels. All scenarios green

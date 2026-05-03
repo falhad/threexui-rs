@@ -1,6 +1,19 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use std::time::Duration;
+
+static CRYPTO_PROVIDER_INIT: Once = Once::new();
+
+/// Install the `ring` rustls provider as the process default the first time
+/// any client is constructed. Idempotent and safe to call repeatedly. We do
+/// not depend on `aws-lc-sys` because its native build trips a compiler-bug
+/// check on common CI compilers; `ring` works everywhere.
+fn ensure_crypto_provider() {
+    CRYPTO_PROVIDER_INIT.call_once(|| {
+        // Ignore the error: a second installation attempt fails harmlessly.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
 
 use crate::api::custom_geo::CustomGeoApi;
 use crate::api::inbounds::InboundsApi;
@@ -61,6 +74,7 @@ pub struct Client {
 
 impl Client {
     pub fn new(config: ClientConfig) -> Self {
+        ensure_crypto_provider();
         let mut builder = reqwest::Client::builder()
             .cookie_store(true)
             .danger_accept_invalid_certs(config.accept_invalid_certs)

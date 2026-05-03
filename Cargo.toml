@@ -1,6 +1,6 @@
 [package]
 name = "threexui-rs"
-version = "2.9.4"
+version = "2.9.5"
 edition = "2021"
 rust-version = "1.75"
 description = "Async Rust SDK for the 3x-ui panel API (compatible with 3x-ui v2.9.2 and v2.9.3)"
@@ -13,7 +13,8 @@ documentation = "https://docs.rs/threexui-rs"
 exclude = ["/docs", "/.github"]
 
 [dependencies]
-reqwest = { version = "0.13", default-features = false, features = ["json", "cookies", "multipart", "rustls", "form", "socks"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "cookies", "multipart", "rustls-no-provider", "form", "socks"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

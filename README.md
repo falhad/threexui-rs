@@ -9,10 +9,11 @@ An async Rust SDK for the [3x-ui](https://github.com/MHSanaei/3x-ui) panel API. 
 
 ## Version compatibility
 
-| threexui-rs | 3x-ui panel(s)        |
-|-------------|------------------------|
-| 2.9.4       | v2.9.2, v2.9.3        |
-| 2.9.3       | v2.9.3                |
+| threexui-rs   | 3x-ui panel(s)         |
+|---------------|------------------------|
+| 2.9.5         | v2.9.2, v2.9.3         |
+| 2.9.4         | v2.9.2, v2.9.3 (yanked: aws-lc-sys CI build break) |
+| 2.9.3         | v2.9.3                 |
 
 `2.9.4` is live-tested against both panel versions. The only behavioral
 difference: `inbounds.copy_clients` does not exist in v2.9.2 and returns
@@ -22,7 +23,7 @@ difference: `inbounds.copy_clients` does not exist in v2.9.2 and returns
 
 ```toml
 [dependencies]
-threexui-rs = "2.9.4"
+threexui-rs = "2.9.5"
 tokio = { version = "1", features = ["full"] }
 ```
 
